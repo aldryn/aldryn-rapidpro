@@ -12,6 +12,8 @@ class Form(forms.BaseForm):
         env = partial(djsenv, settings=settings)
         s = settings
 
+        temba_pkg_dir = os.path.join(os.path.dirname(__import__('temba').__file__))
+
         # quickfix so analytics does not explode everywhere
         # TODO: fix rapidpro codebase to work without analytics configured
         s['SEGMENT_IO_KEY'] = env('SEGMENT_IO_KEY', '')
@@ -28,7 +30,7 @@ class Form(forms.BaseForm):
 
         s['IS_PROD'] = boolean_ish(env('IS_PROD', False))
 
-        s['STATIC_URL'] = '/static/'
+        # s['STATIC_URL'] = '/static/'
 
         from temba import settings_common as temba_settings
         s['PERMISSIONS'] = temba_settings.PERMISSIONS
@@ -40,13 +42,7 @@ class Form(forms.BaseForm):
         ])
         s['ANONYMOUS_USER_NAME'] = 'AnonymousUser'
 
-        import temba
-        RAPIDPRO_PACKAGE_DIR = os.path.abspath(os.path.join(os.path.dirname(temba.__file__), '../'))
-        s['LOCALE_PATHS'].append(
-            os.path.join(RAPIDPRO_PACKAGE_DIR, 'locale')
-        )
-        RAPIDPRO_STATICFILES_DIR = os.path.join(RAPIDPRO_PACKAGE_DIR, 'static')
-        s['STATICFILES_DIRS'].append(RAPIDPRO_STATICFILES_DIR)
+        s['STATICFILES_DIRS'].append(os.path.join(temba_pkg_dir, 'media'))
 
         s['LOGIN_URL'] = "/users/login/"
         s['LOGOUT_URL'] = "/users/logout/"
@@ -109,7 +105,7 @@ class Form(forms.BaseForm):
             'modeltranslation',
 
             'timezones',
-
+            'temba',  # for templates, static, locale
             'temba.assets',
             'temba.auth_tweaks',
             'temba.api',
@@ -167,9 +163,9 @@ class Form(forms.BaseForm):
             'temba.middleware.NonAtomicGetsMiddleware',
         ])
 
-        s['TEMPLATES'][0]['DIRS'].append(
-            os.path.join(RAPIDPRO_PACKAGE_DIR, 'templates')
-        )
+        # s['TEMPLATES'][0]['DIRS'].append(
+        #     os.path.join(RAPIDPRO_PACKAGE_DIR, 'templates')
+        # )
 
         # There is a lot of unneeded stuff in temba.urls. but for simplicy
         # I'm just including all of them for now.
@@ -199,8 +195,9 @@ class Form(forms.BaseForm):
         # django-compressor  TODO: cleanup for deployment
         if 'compressor.finders.CompressorFinder' not in s['STATICFILES_FINDERS']:
             s['STATICFILES_FINDERS'].append('compressor.finders.CompressorFinder')
+        less_file_folder = os.path.abspath(os.path.join(os.path.dirname(__import__('temba').__file__), 'static/less'))
         s['COMPRESS_PRECOMPILERS'] = (
-            ('text/less', 'lessc --include-path="%s" {infile} {outfile}' % os.path.join(RAPIDPRO_STATICFILES_DIR, 'less')),
+            ('text/less', 'lessc --include-path="%s" {infile} {outfile}' % less_file_folder),
             ('text/coffeescript', 'coffee --compile --stdio'))
         s['COMPRESS_OFFLINE_CONTEXT'] = dict(STATIC_URL=s['STATIC_URL'], base_template='frame.html')
 
