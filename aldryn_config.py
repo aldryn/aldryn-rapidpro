@@ -1,14 +1,11 @@
 # -*- coding: utf-8 -*-
-import json
 import os
-import sys
 from aldryn_client import forms
 
 
 class Form(forms.BaseForm):
 
     def to_settings(self, data, settings):
-        import warnings
         from functools import partial
         from aldryn_addons.utils import boolean_ish, djsenv
         from django.utils.translation import ugettext_lazy as _
@@ -17,11 +14,19 @@ class Form(forms.BaseForm):
 
         # quickfix so analytics does not explode everywhere
         # TODO: fix rapidpro codebase to work without analytics configured
+        s['SEGMENT_IO_KEY'] = env('SEGMENT_IO_KEY', '')
         import analytics
-        analytics.write_key = '123'
+        analytics.write_key = s['SEGMENT_IO_KEY']
+
+        s['LIBRATO_USER'] = env('LIBRATO_USER', '')
+        s['LIBRATO_TOKEN'] = env('LIBRATO_TOKEN', '')
+
+        s['TWITTER_API_KEY'] = env('TWITTER_API_KEY', '')
+        s['TWITTER_API_SECRET'] = env('TWITTER_API_SECRET', '')
 
         # The only thing IS_PROD=False seems to do is enable/disable analytics
-        s['IS_PROD'] = False
+
+        s['IS_PROD'] = boolean_ish(env('IS_PROD', False))
 
         s['STATIC_URL'] = '/static/'
 
@@ -41,16 +46,7 @@ class Form(forms.BaseForm):
             os.path.join(RAPIDPRO_PACKAGE_DIR, 'locale')
         )
         RAPIDPRO_STATICFILES_DIR = os.path.join(RAPIDPRO_PACKAGE_DIR, 'static')
-        # PROJECT_DIR = os.path.join(os.path.abspath(os.path.dirname(__file__)))
-        # LOCALE_PATHS = (os.path.join(PROJECT_DIR, '../locale'),)
-        # RESOURCES_DIR = os.path.join(PROJECT_DIR, '../resources')
-        # FIXTURE_DIRS = (os.path.join(PROJECT_DIR, '../fixtures'),)
-        # TESTFILES_DIR = os.path.join(PROJECT_DIR, '../testfiles')
-        # TEMPLATE_DIRS = (os.path.join(PROJECT_DIR, '../templates'),)
-        # STATICFILES_DIRS = (os.path.join(PROJECT_DIR, '../static'), os.path.join(PROJECT_DIR, '../media'), )
-
         s['STATICFILES_DIRS'].append(RAPIDPRO_STATICFILES_DIR)
-
 
         s['LOGIN_URL'] = "/users/login/"
         s['LOGOUT_URL'] = "/users/logout/"
@@ -58,9 +54,9 @@ class Form(forms.BaseForm):
         s['LOGOUT_REDIRECT_URL'] = "/"
 
         # FIXME: Branding.
-        s['DEFAULT_BRAND'] = 'rapidpro.local.aldryn.net'
+        s['DEFAULT_BRAND'] = 'default'
         s['BRANDING'] = {
-            'rapidpro.local.aldryn.net': {
+            'default': {
                 'slug': 'rapidpro',
                 'name': 'RapidPro',
                 'org': 'UNICEF',
@@ -84,15 +80,14 @@ class Form(forms.BaseForm):
                 'credits': _("Copyright &copy; 2012-2015 UNICEF, Nyaruka. All Rights Reserved.")
             }
         }
-        # FIXME: HOSTNAME and TEMBA_HOST should be the real domain used and
-        #        available from the network.
-        s['HOSTNAME'] = 'rapidpro.local.aldryn.net'
-        s['TEMBA_HOST'] = 'rapidpro.local.aldryn.net'  # used for webhooks back to this system
+        default_hostname = 'rapidpro.aldryn.me'
+        s['HOSTNAME'] = s.get('DOMAIN', default_hostname)
+        s['TEMBA_HOST'] = s.get('DOMAIN', default_hostname)
 
         s['USER_TIME_ZONE'] = 'UTC'
         s['USE_TZ'] = True  # TODO: this should really be in aldryn-django as a default
         s['TIME_ZONE'] = 'UTC'  # TODO: this should really be in aldryn-django as a default
-        s['DEFAULT_LANGUAGE'] = 'en'
+        s['DEFAULT_LANGUAGE'] = s['LANGUAGE_CODE']
 
         # settings required in migrations, but are probably outdated
         s['AWS_STORAGE_BUCKET_NAME'] = ''
@@ -139,7 +134,7 @@ class Form(forms.BaseForm):
 
         # Because of ancient version of django-modeltranslation.
         # Is it REALLY needed?
-        s['MODELTRANSLATION_TRANSLATION_REGISTRY'] = "translation"
+        s['MODELTRANSLATION_TRANSLATION_REGISTRY'] = 'translation'
 
         # switch to new style TEMPLATES config?
         loaders = s['TEMPLATES'][0]['OPTIONS']['loaders']
@@ -194,6 +189,7 @@ class Form(forms.BaseForm):
             'handlers': ['console'],
             'propagate': False,
         }
+        # TODO: put into aldryn-django?
         s['LOGGING']['loggers']['django.db.backends'] = {
             'level': 'ERROR',
             'handlers': ['console'],
@@ -218,44 +214,38 @@ class Form(forms.BaseForm):
 
         s['OUTGOING_PROXIES'] = {}
 
-        # FIXME: CELERYBEAT_SCHEDULE
-        # FIXME: CELERY_TASK_MAP
-
         s['MESSAGE_HANDLERS'] = temba_settings.MESSAGE_HANDLERS
 
         ######
         # DANGER: only turn this on if you know what you are doing!
         #         could cause messages to be sent to live customer aggregators
-        s['SEND_MESSAGES'] = False
+        s['SEND_MESSAGES'] = boolean_ish(env('RAPIDPRO_SEND_MESSAGES', False))
 
         ######
         # DANGER: only turn this on if you know what you are doing!
         #         could cause external APIs to be called in test environment
-        s['SEND_WEBHOOKS'] = False
+        s['SEND_WEBHOOKS'] = boolean_ish(env('RAPIDPRO_SEND_WEBHOOKS', False))
 
         ######
         # DANGER: only turn this on if you know what you are doing!
         #         could cause emails to be sent in test environment
-        s['SEND_EMAILS'] = False
+        s['SEND_EMAILS'] = boolean_ish(env('RAPIDPRO_SEND_EMAILS', False))
 
         ######
         # DANGER: only turn this on if you know what you are doing!
         #         could cause airtime transfers in test environment
-        s['SEND_AIRTIME'] = False
-
-
-        s['TWITTER_API_KEY'] = os.environ.get('TWITTER_API_KEY', 'MISSING_TWITTER_API_KEY')
-        s['TWITTER_API_SECRET'] = os.environ.get('TWITTER_API_SECRET', 'MISSING_TWITTER_API_SECRET')
-
-        s['SEGMENT_IO_KEY'] = os.environ.get('SEGMENT_IO_KEY', '')
-
-        s['LIBRATO_USER'] = os.environ.get('LIBRATO_USER', '')
-        s['LIBRATO_TOKEN'] = os.environ.get('LIBRATO_TOKEN', '')
+        s['SEND_AIRTIME'] = boolean_ish(env('RAPIDPRO_SEND_AIRTIME', False))
 
         s['IP_ADDRESSES'] = []
-        return settings
 
-    def provider_settings(self):
-        MAGE_API_URL = 'http://localhost:8026/api/v1'
-        MAGE_AUTH_TOKEN = '___MAGE_TOKEN_YOU_PICK__'
-        HUB9_ENDPOINT = 'http://175.103.48.29:28078/testing/smsmt.php'
+        CELERYBEAT_SCHEDULE = s.setdefault('CELERYBEAT_SCHEDULE', {})
+        CELERYBEAT_SCHEDULE.update(temba_settings.CELERYBEAT_SCHEDULE)
+
+        # Mapping of task name to task function path, used when CELERY_ALWAYS_EAGER is set to True
+        CELERY_TASK_MAP = s.setdefault('CELERY_TASK_MAP', {})
+        CELERY_TASK_MAP.update(temba_settings.CELERY_TASK_MAP)
+
+        s['MAGE_API_URL'] = env('MAGE_API_URL', '')
+        s['MAGE_AUTH_TOKEN'] = env('MAGE_AUTH_TOKEN', '')
+        s['HUB9_ENDPOINT'] = env('HUB9_ENDPOINT', '')
+        return settings

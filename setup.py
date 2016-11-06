@@ -82,10 +82,6 @@ setup(
         # 'https://github.com/nyaruka/django-hstore/archive/86b461464db2ad99f62c3ea15afad4022f5c0df4.zip#egg=django-hstore',
 
     ),
-    entry_points='''
-        [console_scripts]
-        aldryn-celery=aldryn_celery.cli:main
-    ''',
     include_package_data=True,
     zip_safe=False,
     classifiers=[
